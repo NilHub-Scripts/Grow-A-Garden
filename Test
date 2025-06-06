@@ -1,216 +1,61 @@
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-local RS = game:GetService("ReplicatedStorage")
-local notifui = RS:WaitForChild("Notification_UI_Mobile")
-local topnotif = playerGui:WaitForChild("Top_Notification"):FindFirstChild("Frame")
+-- Fullscreen Ban GUI with fake countdown and kick
+local player = game.Players.LocalPlayer
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "BanScreen"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
 
--- Create ScreenGui
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "IngeniousScriptDupeGUI"
-ScreenGui.Parent = playerGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- Fullscreen Frame
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(1, 0, 1, 0)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 
--- Main Frame
-local Frame = Instance.new("Frame")
-Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Frame.Position = UDim2.new(0.4, 0, 0.35, 0)
-Frame.Size = UDim2.new(0, 260, 0, 130)
-Frame.Active = true
-Frame.Draggable = true
-Frame.BorderSizePixel = 0
-Frame.Parent = ScreenGui
+-- Main Ban Text
+local banText = Instance.new("TextLabel", frame)
+banText.Size = UDim2.new(1, 0, 0, 100)
+banText.Position = UDim2.new(0, 0, 0.4, 0)
+banText.Text = "YOU HAVE BEEN BANNED FROM GROW A GARDEN"
+banText.TextColor3 = Color3.fromRGB(255, 0, 0)
+banText.Font = Enum.Font.SourceSansBold
+banText.TextScaled = true
+banText.BackgroundTransparency = 1
 
--- Add a subtle shadow effect using UIStroke
-local uiStroke = Instance.new("UIStroke")
-uiStroke.Color = Color3.fromRGB(20, 20, 20)
-uiStroke.Thickness = 2
-uiStroke.Parent = Frame
+-- Fake Time Counter Text
+local timeText = Instance.new("TextLabel", frame)
+timeText.Size = UDim2.new(1, 0, 0, 60)
+timeText.Position = UDim2.new(0, 0, 0.5, 10)
+timeText.Text = ""
+timeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+timeText.Font = Enum.Font.SourceSansBold
+timeText.TextScaled = true
+timeText.BackgroundTransparency = 1
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 16)
-UICorner.Parent = Frame
+-- Fake Ban Timer Values
+local years = 79000002
+local months = 142
+local days = 84
+local hours = 126
+local minutes = 1200
+local seconds = 170000000
 
--- TitleBox setup
-local TitleBox = Instance.new("TextLabel")
-TitleBox.BackgroundColor3 = Color3.new(0, 0, 0)
-TitleBox.BackgroundTransparency = 0.4
-TitleBox.Position = UDim2.new(0.07, 0, 0.05, 0)
-TitleBox.Size = UDim2.new(0.86, 0, 0.25, 0)
-TitleBox.Font = Enum.Font.GothamBold
-TitleBox.Text = "NilScript Dupe"
-TitleBox.TextColor3 = Color3.new(1, 1, 1)
-TitleBox.TextScaled = true
-TitleBox.TextStrokeTransparency = 0.7
-TitleBox.TextTransparency = 0.05
-TitleBox.BorderSizePixel = 0
-TitleBox.Parent = Frame
+-- Animate countdown for seconds
+local runService = game:GetService("RunService")
+local startTime = tick()
 
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
-titleCorner.Parent = TitleBox
+-- Update text every frame
+local connection
+connection = runService.RenderStepped:Connect(function()
+	local elapsed = tick() - startTime
+	local displaySeconds = math.max(seconds - math.floor(elapsed * 5), 0)
 
--- Gold texture on title
-local goldTexture = Instance.new("ImageLabel")
-goldTexture.Image = "rbxassetid://11478733258"
-goldTexture.Size = UDim2.new(1, 0, 1, 0)
-goldTexture.BackgroundTransparency = 1
-goldTexture.ZIndex = 0
-goldTexture.Parent = TitleBox
+	local text = string.format("Years: %d   Months: %d   Days: %d   Hours: %d   Minutes: %d   Seconds: %d",
+		years, months, days, hours, minutes, displaySeconds)
 
--- ShineLine - improved shiny effect
-local ShineLine = Instance.new("Frame")
-ShineLine.BackgroundColor3 = Color3.new(1, 1, 1)
-ShineLine.Size = UDim2.new(0.1, 0, 1.2, 0) -- slightly taller for better shine
-ShineLine.Position = UDim2.new(-0.15, 0, -0.1, 0) -- start off screen left
-ShineLine.BackgroundTransparency = 0.6
-ShineLine.BorderSizePixel = 0
-ShineLine.Rotation = 25 -- angled shine
-ShineLine.Parent = TitleBox
-ShineLine.ZIndex = 5
+	timeText.Text = text
+end)
 
--- Smooth continuous shiny tween loop
-local TweenService = game:GetService("TweenService")
-
-local shineTweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-local shineTween1 = TweenService:Create(ShineLine, shineTweenInfo, {Position = UDim2.new(1.2, 0, -0.1, 0)})
-local shineTween2 = TweenService:Create(ShineLine, shineTweenInfo, {Position = UDim2.new(-0.15, 0, -0.1, 0)})
-
-local function loopShine()
-	while true do
-		shineTween1:Play()
-		shineTween1.Completed:Wait()
-		shineTween2:Play()
-		shineTween2.Completed:Wait()
-	end
-end
-task.spawn(loopShine)
-
--- Button setup
-local Button = Instance.new("TextButton")
-Button.Position = UDim2.new(0.07, 0, 0.5, 0)
-Button.Size = UDim2.new(0.86, 0, 0.35, 0)
-Button.Text = "Dupe"
-Button.Font = Enum.Font.GothamBold
-Button.TextSize = 24
-Button.TextColor3 = Color3.new(1, 1, 1)
-Button.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-Button.BorderSizePixel = 0
-Button.Parent = Frame
-
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 12)
-btnCorner.Parent = Button
-
--- Clone animations helper (unchanged)
-local function cloneAnimations(source, target)
-	local sourceAC = source:FindFirstChildOfClass("AnimationController")
-	if not sourceAC then return end
-
-	local targetAC = target:FindFirstChildOfClass("AnimationController")
-	if not targetAC then
-		targetAC = sourceAC:Clone()
-		targetAC.Parent = target
-	end
-
-	for _, track in pairs(sourceAC:GetPlayingAnimationTracks()) do
-		local anim = track.Animation
-		if anim then
-			local newTrack = targetAC:LoadAnimation(anim)
-			newTrack:Play()
-			newTrack.TimePosition = track.TimePosition
-			newTrack.Speed = track.Speed
-		end
-	end
-end
-
-local function cleanName(name)
-	-- Remove all bracketed parts: [anything]
-	return name:gsub("%s*%b[]", ""):gsub("^%s*(.-)%s*$", "%1")
-end
-
--- Button click handler
-Button.MouseButton1Click:Connect(function()
-	local character = player.Character or player.CharacterAdded:Wait()
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local heldTool = character:FindFirstChildOfClass("Tool")
-
-	if not heldTool or not humanoid then
-		Button.Text = "No Tool Held!"
-		Button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-		task.wait(1.5)
-		Button.Text = "Dupe"
-		Button.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-		return
-	end
-
-	local notifClone = notifui:Clone()
-	notifClone:SetAttribute("NotificationTimer", 1.5)
-
-	local imageLabel = notifClone:FindFirstChildOfClass("ImageLabel")
-	if imageLabel then
-		imageLabel.ImageTransparency = 0.5
-	end
-
-	local cleanedDisplayName = cleanName(heldTool.Name)
-
-	-- Count matching tools by cleaned name
-	local count = 0
-	for _, tool in ipairs(character:GetChildren()) do
-		if tool:IsA("Tool") and cleanName(tool.Name) == cleanedDisplayName then
-			count = count + 1
-		end
-	end
-
-	local originalNameUpper = heldTool.Name:upper()
-	local notifText = notifClone:FindFirstChildWhichIsA("TextLabel")
-	if notifText then
-		if originalNameUpper:find("AGE") then
-			notifText.Text = "A Pet Has Been Added To Your Inventory ("..cleanedDisplayName..") [X"..count.."]"
-		else
-			notifText.Text = "A Fruit Has Been Added To Your Inventory ("..cleanedDisplayName..") [X"..count.."]"
-		end
-	end
-
-	for i = 1, 2 do
-		local valObj = Instance.new("IntValue")
-		valObj.Name = "VAL_OBJ"
-		valObj.Value = 0
-		valObj.Parent = notifClone
-	end
-
-	notifClone.Parent = topnotif
-
-	local clone = heldTool:Clone()
-
-	-- Clone AnimationControllers inside tool.Handle models
-	for _, desc in ipairs(heldTool:GetDescendants()) do
-		if desc:IsA("AnimationController") and desc.Parent:IsA("Model") then
-			local corresponding = clone:FindFirstChild(desc.Parent.Name, true)
-			if corresponding then
-				local existingAC = corresponding:FindFirstChildOfClass("AnimationController")
-				if existingAC then existingAC:Destroy() end
-				desc:Clone().Parent = corresponding
-			end
-		end
-	end
-
-	clone.Parent = character
-	humanoid:EquipTool(clone)
-
-	-- Copy animations for any model with AnimationController inside the tool
-	for _, origModel in ipairs(heldTool:GetDescendants()) do
-		if origModel:IsA("Model") and origModel:FindFirstChildOfClass("AnimationController") then
-			local clonedModel = clone:FindFirstChild(origModel.Name, true)
-			if clonedModel then
-				cloneAnimations(origModel, clonedModel)
-			end
-		end
-	end
-
-	Button.Text = "✔️ Duped!"
-	Button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-	task.wait(1.5)
-	Button.Text = "Dupe"
-	Button.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+-- Kick after 10 seconds
+task.delay(10, function()
+	if connection then connection:Disconnect() end
+	player:Kick("You have been banned from grow a garden, This ban is permanent join discord to appeal.")
 end)
