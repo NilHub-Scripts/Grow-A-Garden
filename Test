@@ -35,6 +35,4 @@ for i = 1, 6 do
 	flash:Destroy()
 end
 
--- Auto-remove GUI after 5 seconds
-wait(5)
-gui:Destroy()
+-- Auto-remove GUI after 5 second
