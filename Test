@@ -1,38 +1,248 @@
--- LocalScript (e.g., place in StarterGui or inject via exploit)
+--// Load Orion UI
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
 
-local player = game:GetService("Players").LocalPlayer
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "ScaryMoment"
-gui.ResetOnSpawn = false
+--// Window
+local Window = OrionLib:MakeWindow({
+	Name = "Grow-a-Garden GUI",
+	HidePremium = false,
+	SaveConfig = true,
+	ConfigFolder = "GrowAGarden",
+	IntroText = "by x2zu"
+})
 
--- Fullscreen scary image
-local img = Instance.new("ImageLabel")
-img.Size = UDim2.new(1, 0, 1, 0)
-img.Position = UDim2.new(0, 0, 0, 0)
-img.BackgroundTransparency = 1
-img.Image = "rbxassetid://115221281063583" -- Your scary image
-img.Parent = gui
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
 
--- Loud scream sound
-local scream = Instance.new("Sound")
-scream.SoundId = "rbxassetid://18925320031" -- Your new loud sound
-scream.Volume = 10 -- Max volume
-scream.Looped = false
-scream.Parent = gui
+local GameEvents = ReplicatedStorage:WaitForChild("GameEvents")
+local buySeedEvent = GameEvents:WaitForChild("BuySeedStock")
+local plantSeedEvent = GameEvents:WaitForChild("Plant_RE")
 
--- Play sound
-scream:Play()
+--// State
+local settings = {
+	auto_buy_seeds = true,
+	use_distance_check = true,
+	collection_distance = 17,
+	collect_nearest_fruit = true,
+	debug_mode = false
+}
 
--- Optional red flash effect
-for i = 1, 6 do
-	local flash = Instance.new("Frame")
-	flash.BackgroundColor3 = Color3.new(1, 0, 0)
-	flash.Size = UDim2.new(1, 0, 1, 0)
-	flash.BackgroundTransparency = 0.7
-	flash.ZIndex = 10
-	flash.Parent = gui
-	wait(0.1)
-	flash:Destroy()
+local plant_position = nil
+local selected_seed = "Carrot"
+local is_auto_planting = false
+local is_auto_collecting = false
+
+--// Utility Functions
+local function notify(title, content)
+	OrionLib:MakeNotification({Name = title, Content = content, Time = 3})
 end
 
--- Auto-remove GUI after 5 second
+local function get_player_farm()
+	for _, farm in ipairs(workspace.Farm:GetChildren()) do
+		local important = farm:FindFirstChild("Important")
+		if important and important:FindFirstChild("Data") then
+			local owner = important.Data:FindFirstChild("Owner")
+			if owner and owner.Value == localPlayer.Name then
+				return farm
+			end
+		end
+	end
+	return nil
+end
+
+local function buy_seed(seed)
+	if playerGui.Seed_Shop.Frame.ScrollingFrame[seed].Main_Frame.Cost_Text.TextColor3 ~= Color3.fromRGB(255, 0, 0) then
+		if settings.debug_mode then print("Buying:", seed) end
+		buySeedEvent:FireServer(seed)
+	end
+end
+
+local function equip_seed(seed)
+	local char = localPlayer.Character
+	if not char then return false end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return false end
+
+	for _, tool in ipairs(localPlayer.Backpack:GetChildren()) do
+		if tool:GetAttribute("ITEM_TYPE") == "Seed" and tool:GetAttribute("Seed") == seed then
+			humanoid:EquipTool(tool)
+			task.wait()
+			return char:FindFirstChildOfClass("Tool")
+		end
+	end
+
+	return char:FindFirstChildOfClass("Tool")
+end
+
+local function auto_collect_fruits()
+	while is_auto_collecting do
+		local char = localPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local farm = get_player_farm()
+
+		if not (root and farm and farm.Important and farm.Important.Plants_Physical) then
+			task.wait(0.5)
+			continue
+		end
+
+		local plants = farm.Important.Plants_Physical
+		local nearest, min_dist = nil, math.huge
+
+		for _, plant in ipairs(plants:GetChildren()) do
+			for _, desc in ipairs(plant:GetDescendants()) do
+				if desc:IsA("ProximityPrompt") and desc.Enabled then
+					local dist = (root.Position - desc.Parent.Position).Magnitude
+					local valid = not settings.use_distance_check or dist <= settings.collection_distance
+					if valid then
+						if settings.collect_nearest_fruit and dist < min_dist then
+							min_dist = dist
+							nearest = desc
+						elseif not settings.collect_nearest_fruit then
+							fireproximityprompt(desc)
+							task.wait(0.05)
+						end
+					end
+				end
+			end
+		end
+
+		if settings.collect_nearest_fruit and nearest then
+			fireproximityprompt(nearest)
+			task.wait(0.05)
+		end
+
+		task.wait()
+	end
+end
+
+local function auto_plant_seeds(seed)
+	while is_auto_planting do
+		local tool = equip_seed(seed)
+
+		if not tool and settings.auto_buy_seeds then
+			buy_seed(seed)
+			task.wait(0.2)
+			tool = equip_seed(seed)
+		end
+
+		if tool and plant_position then
+			local qty = tool:GetAttribute("Quantity")
+			if qty and qty > 0 then
+				plantSeedEvent:FireServer(plant_position, seed)
+			end
+		end
+
+		task.wait(0.2)
+	end
+end
+
+--// Set Default Position
+local farm = get_player_farm()
+if farm and farm.Important and farm.Important.Plant_Locations then
+	local part = farm.Important.Plant_Locations:FindFirstChildOfClass("Part")
+	plant_position = part and part.Position or Vector3.new(0,0,0)
+else
+	plant_position = Vector3.new(0,0,0)
+end
+
+--// Main Tab
+local MainTab = Window:MakeTab({
+	Name = "Main",
+	Icon = "rbxassetid://124620632231839",
+	PremiumOnly = false
+})
+
+MainTab:AddButton({
+	Name = "Set Plant Position",
+	Callback = function()
+		local char = localPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if root then
+			plant_position = root.Position
+			notify("Set", "New plant position set!")
+		end
+	end
+})
+
+MainTab:AddDropdown({
+	Name = "Seed Type",
+	Default = "Carrot",
+	Options = {"Carrot", "Strawberry", "Blueberry", "Orange Tulip", "Tomato", "Corn", "Watermelon", "Daffodil", "Pumpkin", "Apple", "Bamboo", "Coconut", "Cactus", "Dragon Fruit", "Mango", "Grape", "Mushroom", "Pepper", "Cacao", "Beanstalk"},
+	Callback = function(Value)
+		selected_seed = Value
+	end
+})
+
+MainTab:AddToggle({
+	Name = "Auto Plant",
+	Default = false,
+	Callback = function(val)
+		is_auto_planting = val
+		if val then task.spawn(auto_plant_seeds, selected_seed) end
+	end
+})
+
+MainTab:AddToggle({
+	Name = "Auto Collect",
+	Default = false,
+	Callback = function(val)
+		is_auto_collecting = val
+		if val then task.spawn(auto_collect_fruits) end
+	end
+})
+
+--// Settings Tab
+local SettingsTab = Window:MakeTab({
+	Name = "Settings",
+	Icon = "rbxassetid://96957318452720",
+	PremiumOnly = false
+})
+
+SettingsTab:AddToggle({
+	Name = "Auto Buy Seeds",
+	Default = true,
+	Callback = function(val)
+		settings.auto_buy_seeds = val
+	end
+})
+
+SettingsTab:AddToggle({
+	Name = "Use Distance Check",
+	Default = true,
+	Callback = function(val)
+		settings.use_distance_check = val
+	end
+})
+
+SettingsTab:AddToggle({
+	Name = "Collect Nearest Fruit",
+	Default = true,
+	Callback = function(val)
+		settings.collect_nearest_fruit = val
+	end
+})
+
+SettingsTab:AddSlider({
+	Name = "Collection Distance",
+	Min = 1,
+	Max = 30,
+	Default = 17,
+	Increment = 1,
+	Callback = function(val)
+		settings.collection_distance = val
+	end
+})
+
+SettingsTab:AddToggle({
+	Name = "Debug Mode",
+	Default = false,
+	Callback = function(val)
+		settings.debug_mode = val
+	end
+})
+
+-- Startup
+notify("Loaded", "Grow-a-Garden script by x2zu loaded!")
+OrionLib:Init()
